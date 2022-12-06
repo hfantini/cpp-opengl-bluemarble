@@ -19,6 +19,7 @@ target_link_directories(BLUEMARBLE PRIVATE
 target_link_libraries(BLUEMARBLE PRIVATE
 	glfw3.lib
 	glew32.lib
+	opengl32.lib
 )
 
 add_custom_command(TARGET BLUEMARBLE POST_BUILD
