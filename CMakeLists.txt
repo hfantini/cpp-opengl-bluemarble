@@ -25,4 +25,5 @@ target_link_libraries(BLUEMARBLE PRIVATE
 add_custom_command(TARGET BLUEMARBLE POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/libs/glew/bin/glew32.dll" "${CMAKE_BINARY_DIR}/glew32.dll"
 	COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/src/shaders" "${CMAKE_BINARY_DIR}/shaders"
+	COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/src/textures" "${CMAKE_BINARY_DIR}/textures"
 )

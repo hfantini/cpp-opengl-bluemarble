@@ -9,6 +9,9 @@
 #include <ext.hpp>
 #include <fstream>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 GLint GLMajorVersion = 0;
@@ -130,7 +133,43 @@ struct Vertex
 {
 	glm::vec3 position;
 	glm::vec3 color;
+	glm::vec2 UV;
 };
+
+GLuint loadTexture(const char* textureFile)
+{
+
+	stbi_set_flip_vertically_on_load(true);
+
+	int textureWidth = 0;
+	int textureHeight = 0;
+	int numberOfComponents = 0;
+
+	unsigned char* textureData = stbi_load(textureFile, &textureWidth, &textureHeight, &numberOfComponents, 3);
+
+	if (textureData == nullptr)
+	{
+		std::stringstream ss;
+		ss << "Cannot open texture file: " << textureFile;
+		throw std::exception(ss.str().c_str());
+	}
+
+	GLuint textureID;
+	glGenTextures(1, &textureID);
+
+	glBindTexture(GL_TEXTURE_2D, textureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, textureWidth, textureHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, textureData);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	stbi_image_free(textureData);
+
+	return textureID;
+}
 
 int main()
 {
@@ -173,13 +212,16 @@ int main()
 		// LOAD, COMPILE AND LINK PROGRAM BASED ON VERTEX AND FRAGMENT SHADER
 		GLint shaderProgramID = loadShader("shaders/triangle_vertex.glsl", "shaders/triangle_frag.glsl");
 
+		// LOAD TEXTURE
+		GLuint textureID = loadTexture("textures/earth.jpg");
+
 		// TRIANGLE VERTEX
 
 		std::array<Vertex, 3> triangle =
 		{
-			Vertex{glm::vec3 {-1.0f, -1.0f, 0.0f}, glm::vec3 {1.0f, 0.0f, 0.0f}},
-			Vertex{glm::vec3 {1.0f, -1.0f, 0.0f}, glm::vec3 {0.0f, 1.0f, 0.0f}},
-			Vertex{glm::vec3 {0.0f, 1.0f, 0.0f}, glm::vec3 {0.0f, 0.0f, 1.0f}}
+			Vertex{glm::vec3 {-1.0f, -1.0f, 0.0f}, glm::vec3 {1.0f, 0.0f, 0.0f}, glm::vec2 {0.0, 0.0}},
+			Vertex{glm::vec3 {1.0f, -1.0f, 0.0f}, glm::vec3 {0.0f, 1.0f, 0.0f}, glm::vec2 {1.0, 0.0}},
+			Vertex{glm::vec3 {0.0f, 1.0f, 0.0f}, glm::vec3 {0.0f, 0.0f, 1.0f}, glm::vec2 {0.0, 1.0}}
 		};
 
 		// MODEL MATRIX
@@ -213,7 +255,7 @@ int main()
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(triangle), triangle.data(), GL_STATIC_DRAW);
 
-		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+		glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
 
 		while (!glfwWindowShouldClose(window))
 		{
@@ -224,17 +266,26 @@ int main()
 			GLint modelViewProjectionLoc = glGetUniformLocation(shaderProgramID, "modelViewProjection");
 			glUniformMatrix4fv(modelViewProjectionLoc, 1, GL_FALSE, glm::value_ptr(modelViewProjectionMatrix));
 
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, textureID);
+			GLint textureSamplerLoc = glGetUniformLocation(shaderProgramID, "textureSampler");
+			glUniform1i(textureSamplerLoc, 0);
+
 			glEnableVertexAttribArray(0);
 			glEnableVertexAttribArray(1);
+			glEnableVertexAttribArray(2);
+
 			glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
 			glVertexAttribPointer(1, 3, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, color)));
+			glVertexAttribPointer(2, 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, UV)));
 
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 			glDisableVertexAttribArray(0);
 			glDisableVertexAttribArray(1);
+			glDisableVertexAttribArray(2);
 			glUseProgram(0);
 
 			glfwPollEvents();
