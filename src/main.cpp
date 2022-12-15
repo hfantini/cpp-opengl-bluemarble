@@ -208,14 +208,6 @@ int main()
 
 		// APPLYING THE modelViewProjectionMatrix IN EACH TRIANGLE VERTEX
 
-		for (Vertex& vertex : triangle)
-		{
-			glm::vec4 projectedVertex = modelViewProjectionMatrix * glm::vec4{ vertex.position, 1.0f };
-			projectedVertex = projectedVertex / projectedVertex.w;
-			vertex.position = projectedVertex;
-		}
-
-
 		GLuint vertexBuffer;
 		glGenBuffers(1, &vertexBuffer);
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
@@ -228,6 +220,9 @@ int main()
 			glClear(GL_COLOR_BUFFER_BIT);
 
 			glUseProgram(shaderProgramID);
+
+			GLint modelViewProjectionLoc = glGetUniformLocation(shaderProgramID, "modelViewProjection");
+			glUniformMatrix4fv(modelViewProjectionLoc, 1, GL_FALSE, glm::value_ptr(modelViewProjectionMatrix));
 
 			glEnableVertexAttribArray(0);
 			glEnableVertexAttribArray(1);
