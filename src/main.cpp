@@ -19,8 +19,6 @@ GLint GLMajorVersion = 0;
 GLint GLMinorVersion = 0;
 std::string title = std::string("BLUE MARBLE - HF");
 
-Camera* camera;
-
 std::string readFile(const char* path)
 {
 	std::string retValue;
@@ -232,7 +230,7 @@ int main()
 
 		// CAMERA
 
-		camera = new Camera(WINDOW_WIDTH, WINDOW_HEIGHT);
+		Camera camera = Camera(WINDOW_WIDTH, WINDOW_HEIGHT);
 
 		// MODEL MATRIX
 
@@ -254,7 +252,7 @@ int main()
 			glUseProgram(shaderProgramID);
 
 			GLint modelViewProjectionLoc = glGetUniformLocation(shaderProgramID, "modelViewProjection");
-			glUniformMatrix4fv(modelViewProjectionLoc, 1, GL_FALSE, glm::value_ptr(camera->getViewProjection() * modelMatrix));
+			glUniformMatrix4fv(modelViewProjectionLoc, 1, GL_FALSE, glm::value_ptr(camera.getViewProjection() * modelMatrix));
 
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, textureID);
@@ -283,7 +281,6 @@ int main()
 		}
 
 		glDeleteBuffers(1, &vertexBuffer);
-		delete camera;
 		glfwTerminate();
 		return 0;
 	}
@@ -293,7 +290,6 @@ int main()
 		ss << "Fatal Exception! The program cannot continue: " << e.what();
 		MessageBox(NULL, ss.str().c_str(), "Ops!", MB_OK | MB_ICONERROR);
 		glfwTerminate();
-		delete camera;
 		return 1;
 	}
 }
