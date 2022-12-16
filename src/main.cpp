@@ -217,11 +217,14 @@ int main()
 
 		// TRIANGLE VERTEX
 
-		std::array<Vertex, 3> triangle =
+		std::array<Vertex, 6> triangle =
 		{
 			Vertex{glm::vec3 {-1.0f, -1.0f, 0.0f}, glm::vec3 {1.0f, 0.0f, 0.0f}, glm::vec2 {0.0, 0.0}},
 			Vertex{glm::vec3 {1.0f, -1.0f, 0.0f}, glm::vec3 {0.0f, 1.0f, 0.0f}, glm::vec2 {1.0, 0.0}},
-			Vertex{glm::vec3 {0.0f, 1.0f, 0.0f}, glm::vec3 {0.0f, 0.0f, 1.0f}, glm::vec2 {0.0, 1.0}}
+			Vertex{glm::vec3 {-1.0f, 1.0f, 0.0f}, glm::vec3 {0.0f, 0.0f, 1.0f}, glm::vec2 {0.0, 1.0}},
+			Vertex{glm::vec3 {-1.0f, 1.0f, 0.0f}, glm::vec3 {1.0f, 0.0f, 0.0f}, glm::vec2 {0.0, 1.0}},
+			Vertex{glm::vec3 {1.0f, -1.0f, 0.0f}, glm::vec3 {0.0f, 1.0f, 0.0f}, glm::vec2 {1.0, 0.0}},
+			Vertex{glm::vec3 {1.0f, 1.0f, 0.0f}, glm::vec3 {0.0f, 0.0f, 1.0f}, glm::vec2 {1.0, 1.0}}
 		};
 
 		// MODEL MATRIX
@@ -230,8 +233,8 @@ int main()
 
 		// VIEW MATRIX
 
-		glm::vec3 eye{ 0.0f, 0.0f, -5.0f };
-		glm::vec3 center{ 0.0f, 0.0f, 00.0f };
+		glm::vec3 eye{ 0.0f, 0.0f, 5.0f };
+		glm::vec3 center{ 0.0f, 0.0f, 0.0f };
 		glm::vec3 up{ 0.0f, 1.0f, 0.0f };
 		glm::mat4 viewMatrix = glm::lookAt(eye, center, up);
 
@@ -280,7 +283,7 @@ int main()
 			glVertexAttribPointer(1, 3, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, color)));
 			glVertexAttribPointer(2, 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, UV)));
 
-			glDrawArrays(GL_TRIANGLES, 0, 3);
+			glDrawArrays(GL_TRIANGLES, 0, sizeof(triangle));
 
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 			glDisableVertexAttribArray(0);
