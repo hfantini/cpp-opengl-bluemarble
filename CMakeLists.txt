@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.12)
 
 project(CPP-OPENGL-BLUEMARBLE)
 
-add_executable(BLUEMARBLE ./src/main.cpp)
+add_executable(BLUEMARBLE ./src/main.cpp "src/camera.cpp")
 
 target_include_directories(BLUEMARBLE PRIVATE 
 	libs/glm/include

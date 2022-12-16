@@ -8,6 +8,7 @@
 #include <glm.hpp>
 #include <ext.hpp>
 #include <fstream>
+#include "camera.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -17,6 +18,8 @@ const int WINDOW_HEIGHT = 600;
 GLint GLMajorVersion = 0;
 GLint GLMinorVersion = 0;
 std::string title = std::string("BLUE MARBLE - HF");
+
+Camera* camera;
 
 std::string readFile(const char* path)
 {
@@ -217,7 +220,7 @@ int main()
 
 		// TRIANGLE VERTEX
 
-		std::array<Vertex, 6> triangle =
+		std::array<Vertex, 6> quad =
 		{
 			Vertex{glm::vec3 {-1.0f, -1.0f, 0.0f}, glm::vec3 {1.0f, 0.0f, 0.0f}, glm::vec2 {0.0, 0.0}},
 			Vertex{glm::vec3 {1.0f, -1.0f, 0.0f}, glm::vec3 {0.0f, 1.0f, 0.0f}, glm::vec2 {1.0, 0.0}},
@@ -227,36 +230,20 @@ int main()
 			Vertex{glm::vec3 {1.0f, 1.0f, 0.0f}, glm::vec3 {0.0f, 0.0f, 1.0f}, glm::vec2 {1.0, 1.0}}
 		};
 
+		// CAMERA
+
+		camera = new Camera(WINDOW_WIDTH, WINDOW_HEIGHT);
+
 		// MODEL MATRIX
 
 		glm::mat4 modelMatrix = glm::identity<glm::mat4>();
 
-		// VIEW MATRIX
-
-		glm::vec3 eye{ 0.0f, 0.0f, 5.0f };
-		glm::vec3 center{ 0.0f, 0.0f, 0.0f };
-		glm::vec3 up{ 0.0f, 1.0f, 0.0f };
-		glm::mat4 viewMatrix = glm::lookAt(eye, center, up);
-
-		// PROJECTION MATRIX
-
-		constexpr float fov = glm::radians(45.0f);
-		const float aspectRatio = WINDOW_WIDTH / WINDOW_HEIGHT;
-		const float fNear = 0.001f;
-		const float fFar = 1000.0f;
-
-		glm::mat4 projectionMatrix = glm::perspective(fov, aspectRatio, fNear, fFar);
-
-		// MODEL VIEW PROJECTION (MADE BY THE CPU FOR TESTING PURPOSES)
-
-		glm::mat4 modelViewProjectionMatrix = projectionMatrix * viewMatrix * modelMatrix;
-
-		// APPLYING THE modelViewProjectionMatrix IN EACH TRIANGLE VERTEX
+		// CREATING VEXTEX BUFFER
 
 		GLuint vertexBuffer;
 		glGenBuffers(1, &vertexBuffer);
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(triangle), triangle.data(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad.data(), GL_STATIC_DRAW);
 
 		glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
 
@@ -267,7 +254,7 @@ int main()
 			glUseProgram(shaderProgramID);
 
 			GLint modelViewProjectionLoc = glGetUniformLocation(shaderProgramID, "modelViewProjection");
-			glUniformMatrix4fv(modelViewProjectionLoc, 1, GL_FALSE, glm::value_ptr(modelViewProjectionMatrix));
+			glUniformMatrix4fv(modelViewProjectionLoc, 1, GL_FALSE, glm::value_ptr(camera->getViewProjection() * modelMatrix));
 
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, textureID);
@@ -283,7 +270,7 @@ int main()
 			glVertexAttribPointer(1, 3, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, color)));
 			glVertexAttribPointer(2, 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, UV)));
 
-			glDrawArrays(GL_TRIANGLES, 0, sizeof(triangle));
+			glDrawArrays(GL_TRIANGLES, 0, sizeof(quad));
 
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 			glDisableVertexAttribArray(0);
@@ -296,6 +283,7 @@ int main()
 		}
 
 		glDeleteBuffers(1, &vertexBuffer);
+		delete camera;
 		glfwTerminate();
 		return 0;
 	}
@@ -304,6 +292,8 @@ int main()
 		std::stringstream ss;
 		ss << "Fatal Exception! The program cannot continue: " << e.what();
 		MessageBox(NULL, ss.str().c_str(), "Ops!", MB_OK | MB_ICONERROR);
+		glfwTerminate();
+		delete camera;
 		return 1;
 	}
 }
