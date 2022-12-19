@@ -8,7 +8,9 @@
 #include <glm.hpp>
 #include <ext.hpp>
 #include <fstream>
+#include <math.h>
 #include "camera.hpp"
+#include "gtx/string_cast.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -17,6 +19,10 @@ const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 GLint GLMajorVersion = 0;
 GLint GLMinorVersion = 0;
+bool mouseMoveEnabled = false;
+glm::vec2 mouseSensitivity{ 0.3f, 0.3f };
+glm::vec2 previousCursorPosition{ 0.0f, 0.0f };
+glm::vec2 deltaCursorMovement{ 0.0f, 0.0f };
 std::string title = std::string("BLUE MARBLE - HF");
 
 std::string readFile(const char* path)
@@ -172,6 +178,44 @@ GLuint loadTexture(const char* textureFile)
 	return textureID;
 }
 
+void updateWindowFPS(GLFWwindow* window, const char* original, double fps)
+{
+	std::stringstream ss;
+	ss << original << " | FPS: " << fps;
+	glfwSetWindowTitle(window, ss.str().c_str());
+}
+
+void mouseButtonCallback(GLFWwindow* window, int button, int action, int modifier)
+{
+	if (button == GLFW_MOUSE_BUTTON_2)
+	{
+		if (action == GLFW_PRESS)
+		{
+			double x, y;
+			glfwGetCursorPos(window, &x, &y);
+			previousCursorPosition = { x, y };
+			mouseMoveEnabled = true;
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		}
+		
+		if (action == GLFW_RELEASE)
+		{
+			mouseMoveEnabled = false;
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		}
+
+	}
+}
+
+void mouseMoveCallback(GLFWwindow* window, double x, double y)
+{
+	if (mouseMoveEnabled)
+	{
+		glm::vec2 currentCursorPos = { x, y };
+		deltaCursorMovement = currentCursorPos - previousCursorPosition;
+	}
+}
+
 int main()
 {
 	try
@@ -191,6 +235,7 @@ int main()
 			return 1;
 		}
 
+
 		glfwMakeContextCurrent(window);
 		GLenum status = glewInit();
 		if (status != GLEW_OK)
@@ -209,6 +254,8 @@ int main()
 		title = ss.str();
 
 		glfwSetWindowTitle(window, title.c_str());
+		glfwSetMouseButtonCallback(window, mouseButtonCallback);
+		glfwSetCursorPosCallback(window, mouseMoveCallback);
 
 		// LOAD, COMPILE AND LINK PROGRAM BASED ON VERTEX AND FRAGMENT SHADER
 		GLint shaderProgramID = loadShader("shaders/triangle_vertex.glsl", "shaders/triangle_frag.glsl");
@@ -244,11 +291,27 @@ int main()
 		glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad.data(), GL_STATIC_DRAW);
 
 		glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
+		double previousTime = glfwGetTime();
 
 		while (!glfwWindowShouldClose(window))
 		{
-			glClear(GL_COLOR_BUFFER_BIT);
+			double currentTime = glfwGetTime();
+			double deltaTime = currentTime - previousTime;
 
+			if (deltaTime > 0.0)
+			{
+				previousTime = currentTime;
+			}
+
+			// UPDATE TIMINGS
+
+			double fps = std::round( (1000.0 / deltaTime) / 1000.0 );
+			//std::cout << "Previous Time: " << previousTime << " | CurrentTime: " << currentTime << " | Delta Time: " << deltaTime << " | FPS: " << fps << std::endl;
+			updateWindowFPS(window, title.c_str(), fps);
+
+			// STARTING WITH OPENGL OPERATIONS
+
+			glClear(GL_COLOR_BUFFER_BIT);
 			glUseProgram(shaderProgramID);
 
 			GLint modelViewProjectionLoc = glGetUniformLocation(shaderProgramID, "modelViewProjection");
@@ -278,6 +341,45 @@ int main()
 
 			glfwPollEvents();
 			glfwSwapBuffers(window);
+
+			// CHECK FOR KEYBOARD INTERRUPTS
+
+			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+			{
+				camera.moveFoward(2.5f * deltaTime);
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+			{
+				camera.moveFoward(-2.5f * deltaTime);
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+			{
+				camera.moveRight(2.5f * deltaTime);
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+			{
+				camera.moveRight(-2.5f * deltaTime);
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+			{
+				camera.roll(-100.0f * deltaTime);
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+			{
+				camera.roll(100.0f * deltaTime);
+			}
+
+			// CHECK FOR MOUSE MOVEMENT
+
+			if (mouseMoveEnabled)
+			{
+				camera.look((deltaCursorMovement * mouseSensitivity) * glm::vec2(deltaTime) * glm::vec2(-1));
+			}
 		}
 
 		glDeleteBuffers(1, &vertexBuffer);
