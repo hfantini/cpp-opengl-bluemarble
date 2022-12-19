@@ -32,9 +32,9 @@ void Camera::look(glm::vec2 amount)
 	const glm::mat4 identityMatrix = glm::identity<glm::mat4>();
 	glm::mat4 yawRotation = glm::rotate(identityMatrix, glm::radians(amount.x), this->up);
 
-	const glm::vec3 right = glm::normalize(glm::cross(this->direction, this->up));
+	const glm::vec3 right = glm::normalize(glm::cross(this->DEFAULT_DIRECTION , this->up));
 	glm::mat4 pitchRotation = glm::rotate(identityMatrix, glm::radians(amount.y), right);
-	this->direction = yawRotation * pitchRotation * glm::vec4{ this->direction, 0.0f };
+	this->direction = yawRotation * pitchRotation * glm::vec4{ this->DEFAULT_DIRECTION, 1.0f };
 }
 
 void Camera::roll(float amount)

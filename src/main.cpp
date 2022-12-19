@@ -19,10 +19,9 @@ const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 GLint GLMajorVersion = 0;
 GLint GLMinorVersion = 0;
-bool mouseMoveEnabled = false;
-glm::vec2 mouseSensitivity{ 0.3f, 0.3f };
-glm::vec2 previousCursorPosition{ 0.0f, 0.0f };
+glm::vec2 mouseSensitivity{ 0.03f, 0.03f };
 glm::vec2 deltaCursorMovement{ 0.0f, 0.0f };
+Camera camera = Camera(WINDOW_WIDTH, WINDOW_HEIGHT);
 std::string title = std::string("BLUE MARBLE - HF");
 
 std::string readFile(const char* path)
@@ -185,35 +184,10 @@ void updateWindowFPS(GLFWwindow* window, const char* original, double fps)
 	glfwSetWindowTitle(window, ss.str().c_str());
 }
 
-void mouseButtonCallback(GLFWwindow* window, int button, int action, int modifier)
-{
-	if (button == GLFW_MOUSE_BUTTON_2)
-	{
-		if (action == GLFW_PRESS)
-		{
-			double x, y;
-			glfwGetCursorPos(window, &x, &y);
-			previousCursorPosition = { x, y };
-			mouseMoveEnabled = true;
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-		}
-		
-		if (action == GLFW_RELEASE)
-		{
-			mouseMoveEnabled = false;
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-		}
-
-	}
-}
-
 void mouseMoveCallback(GLFWwindow* window, double x, double y)
 {
-	if (mouseMoveEnabled)
-	{
-		glm::vec2 currentCursorPos = { x, y };
-		deltaCursorMovement = currentCursorPos - previousCursorPosition;
-	}
+	glm::vec2 currentCursorPos = { x, y };
+	deltaCursorMovement = currentCursorPos - glm::vec2{ WINDOW_WIDTH / 2, WINDOW_WIDTH / 2 };
 }
 
 int main()
@@ -254,7 +228,7 @@ int main()
 		title = ss.str();
 
 		glfwSetWindowTitle(window, title.c_str());
-		glfwSetMouseButtonCallback(window, mouseButtonCallback);
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		glfwSetCursorPosCallback(window, mouseMoveCallback);
 
 		// LOAD, COMPILE AND LINK PROGRAM BASED ON VERTEX AND FRAGMENT SHADER
@@ -278,10 +252,6 @@ int main()
 			glm::ivec3{0, 1, 3},
 			glm::ivec3{3, 1, 2}
 		};
-
-		// CAMERA
-
-		Camera camera = Camera(WINDOW_WIDTH, WINDOW_HEIGHT);
 
 		// MODEL MATRIX
 
@@ -389,10 +359,7 @@ int main()
 
 			// CHECK FOR MOUSE MOVEMENT
 
-			if (mouseMoveEnabled)
-			{
-				camera.look((deltaCursorMovement * mouseSensitivity) * glm::vec2(deltaTime) * glm::vec2(-1));
-			}
+			camera.look((deltaCursorMovement * mouseSensitivity) * glm::vec2(-1));
 		}
 
 		glDeleteBuffers(1, &vertexBuffer);

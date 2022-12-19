@@ -4,8 +4,9 @@
 class Camera
 {
 	public:
+		const glm::vec3 DEFAULT_DIRECTION{ 0.0f, 0.0f, -1.0f };
 		glm::vec3 position{ 0.0f, 0.0f, 10.0f };
-		glm::vec3 direction{ 0.0f, 0.0f, -1.0f };
+		glm::vec3 direction = DEFAULT_DIRECTION;
 		glm::vec3 up{ 0.0f, 1.0f, 0.0f };
 		void moveFoward(float amount);
 		void moveRight(float amount);
