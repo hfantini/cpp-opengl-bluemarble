@@ -265,14 +265,18 @@ int main()
 
 		// TRIANGLE VERTEX
 
-		std::array<Vertex, 6> quad =
+		std::array<Vertex, 4> quad =
 		{
 			Vertex{glm::vec3 {-1.0f, -1.0f, 0.0f}, glm::vec3 {1.0f, 0.0f, 0.0f}, glm::vec2 {0.0, 0.0}},
 			Vertex{glm::vec3 {1.0f, -1.0f, 0.0f}, glm::vec3 {0.0f, 1.0f, 0.0f}, glm::vec2 {1.0, 0.0}},
-			Vertex{glm::vec3 {-1.0f, 1.0f, 0.0f}, glm::vec3 {0.0f, 0.0f, 1.0f}, glm::vec2 {0.0, 1.0}},
-			Vertex{glm::vec3 {-1.0f, 1.0f, 0.0f}, glm::vec3 {1.0f, 0.0f, 0.0f}, glm::vec2 {0.0, 1.0}},
-			Vertex{glm::vec3 {1.0f, -1.0f, 0.0f}, glm::vec3 {0.0f, 1.0f, 0.0f}, glm::vec2 {1.0, 0.0}},
-			Vertex{glm::vec3 {1.0f, 1.0f, 0.0f}, glm::vec3 {0.0f, 0.0f, 1.0f}, glm::vec2 {1.0, 1.0}}
+			Vertex{glm::vec3 {1.0f, 1.0f, 0.0f}, glm::vec3 {0.0f, 0.0f, 1.0f}, glm::vec2 {1.0, 1.0}},
+			Vertex{glm::vec3 {-1.0f, 1.0f, 0.0f}, glm::vec3 {1.0f, 0.0f, 0.0f}, glm::vec2 {0.0, 1.0}}
+		};
+
+		std::array<glm::ivec3, 2> indices =
+		{
+			glm::ivec3{0, 1, 3},
+			glm::ivec3{3, 1, 2}
 		};
 
 		// CAMERA
@@ -287,8 +291,15 @@ int main()
 
 		GLuint vertexBuffer;
 		glGenBuffers(1, &vertexBuffer);
+
+		GLuint elementBuffer;
+		glGenBuffers(1, &elementBuffer);
+
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
+
 		glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad.data(), GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices.data(), GL_STATIC_DRAW);
 
 		glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
 		double previousTime = glfwGetTime();
@@ -327,13 +338,15 @@ int main()
 			glEnableVertexAttribArray(2);
 
 			glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
 			glVertexAttribPointer(1, 3, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, color)));
 			glVertexAttribPointer(2, 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, UV)));
 
-			glDrawArrays(GL_TRIANGLES, 0, sizeof(quad));
+			glDrawElements(GL_TRIANGLES, sizeof(indices) * 3, GL_UNSIGNED_INT, nullptr);
 
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 			glDisableVertexAttribArray(0);
 			glDisableVertexAttribArray(1);
 			glDisableVertexAttribArray(2);
