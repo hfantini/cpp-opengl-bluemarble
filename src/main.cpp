@@ -21,6 +21,10 @@ GLint GLMajorVersion = 0;
 GLint GLMinorVersion = 0;
 glm::vec2 mouseSensitivity{ 0.03f, 0.03f };
 glm::vec2 deltaCursorMovement{ 0.0f, 0.0f };
+glm::vec2 deltaUpCursorMovement{ 0.0f, 0.0f };
+bool enableVerticalMouseMovement = false;
+glm::vec2 onClickMousePosition{ 0.0f, 0.0f };
+glm::vec3 cameraAnchorPosition{ 0.0f };
 Camera camera = Camera(WINDOW_WIDTH, WINDOW_HEIGHT);
 std::string title = std::string("BLUE MARBLE - HF");
 
@@ -144,7 +148,6 @@ struct Vertex
 
 GLuint loadTexture(const char* textureFile)
 {
-
 	stbi_set_flip_vertically_on_load(true);
 
 	int textureWidth = 0;
@@ -184,10 +187,44 @@ void updateWindowFPS(GLFWwindow* window, const char* original, double fps)
 	glfwSetWindowTitle(window, ss.str().c_str());
 }
 
+void resetMouseValues(GLFWwindow* window)
+{
+	deltaCursorMovement = glm::vec2{ 0.0f };
+	glfwSetCursorPos(window, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2);
+}
+
+void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+{
+	if (button == GLFW_MOUSE_BUTTON_2)
+	{
+		if (action == GLFW_PRESS)
+		{
+			double x, y;
+			glfwGetCursorPos(window, &x, &y);
+			onClickMousePosition = glm::vec2(x, y);
+			cameraAnchorPosition = camera.position;
+			enableVerticalMouseMovement = true;
+		}
+		else
+		{
+			deltaUpCursorMovement = glm::vec2{ 0.0f };
+			enableVerticalMouseMovement = false;
+		}
+	}
+}
+
 void mouseMoveCallback(GLFWwindow* window, double x, double y)
 {
 	glm::vec2 currentCursorPos = { x, y };
-	deltaCursorMovement = currentCursorPos - glm::vec2{ WINDOW_WIDTH / 2, WINDOW_WIDTH / 2 };
+
+	if (enableVerticalMouseMovement)
+	{
+		deltaUpCursorMovement = currentCursorPos - onClickMousePosition;
+	}
+	else
+	{
+		deltaCursorMovement = currentCursorPos - glm::vec2{ WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 };
+	}
 }
 
 int main()
@@ -229,6 +266,8 @@ int main()
 
 		glfwSetWindowTitle(window, title.c_str());
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		resetMouseValues(window);
+		glfwSetMouseButtonCallback(window, mouseButtonCallback);
 		glfwSetCursorPosCallback(window, mouseMoveCallback);
 
 		// LOAD, COMPILE AND LINK PROGRAM BASED ON VERTEX AND FRAGMENT SHADER
@@ -357,9 +396,27 @@ int main()
 				camera.roll(100.0f * deltaTime);
 			}
 
+			if (glfwGetKey(window, GLFW_KEY_HOME) == GLFW_PRESS)
+			{
+				resetMouseValues(window);
+				camera.reset();
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+			{
+				break;
+			}
+
 			// CHECK FOR MOUSE MOVEMENT
 
-			camera.look((deltaCursorMovement * mouseSensitivity) * glm::vec2(-1));
+			if (enableVerticalMouseMovement)
+			{
+				camera.moveMouseAxis((deltaUpCursorMovement * mouseSensitivity), &cameraAnchorPosition);
+			}
+			else
+			{
+				camera.look((deltaCursorMovement * mouseSensitivity) * glm::vec2(-1));
+			}
 		}
 
 		glDeleteBuffers(1, &vertexBuffer);

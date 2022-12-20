@@ -18,14 +18,28 @@ glm::mat4 Camera::getViewProjection() const
 
 void Camera::moveFoward(float amount)
 {
-	position += glm::normalize(direction) * amount * speed;
+	this->position += glm::normalize(this->direction) * amount * this->speed;
 }
 
 void Camera::moveRight(float amount)
 {
 	glm::vec3 right = glm::normalize(glm::cross(this->direction, this->up));
-	position += right * amount * speed;
+	this->position += right * amount * speed;
 }
+
+void Camera::moveMouseAxis(glm::vec2 amount, glm::vec3* anchor, bool useX)
+{
+	glm::vec3 right = glm::normalize(glm::cross(this->direction, this->up));
+	glm::vec3 position = *anchor + (glm::normalize(this->up) * glm::vec3{ amount, 0.0f } *this->speed * -1.0f);
+	
+	if (useX)
+	{
+		position += (right * glm::vec3{ amount, 0.0f } *this->speed * -1.0f);
+	}
+
+	this->position = position;
+}
+
 
 void Camera::look(glm::vec2 amount)
 {
@@ -34,7 +48,7 @@ void Camera::look(glm::vec2 amount)
 
 	const glm::vec3 right = glm::normalize(glm::cross(this->DEFAULT_DIRECTION , this->up));
 	glm::mat4 pitchRotation = glm::rotate(identityMatrix, glm::radians(amount.y), right);
-	this->direction = yawRotation * pitchRotation * glm::vec4{ this->DEFAULT_DIRECTION, 1.0f };
+	this->direction = yawRotation * pitchRotation * glm::vec4{ this->DEFAULT_DIRECTION, 0.0f };
 }
 
 void Camera::roll(float amount)
@@ -43,4 +57,11 @@ void Camera::roll(float amount)
 	glm::mat4 rollRotation = glm::rotate(identityMatrix, glm::radians(amount), {0.0f, 0.0f, 1.0f});
 
 	this->up = rollRotation * glm::vec4{ this->up, 0.0f };
+}
+
+void Camera::reset()
+{
+	this->direction = DEFAULT_DIRECTION;
+	this->position = DEFAULT_POSITION;
+	this->up = DEFAULT_UP;
 }
