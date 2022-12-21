@@ -32,8 +32,15 @@ std::string title = std::string("BLUE MARBLE - HF");
 struct Vertex
 {
 	glm::vec3 position;
+	glm::vec3 normal;
 	glm::vec3 color;
 	glm::vec2 UV;
+};
+
+struct DirectionalLight
+{
+	glm::vec3 direction;
+	GLfloat intensity;
 };
 
 std::string readFile(const char* path)
@@ -198,7 +205,7 @@ void createSphereMesh(GLuint resolution, std::vector<Vertex>& vertices, std::vec
 			const float V = VIndex * negativeRes;
 			const float phi = glm::mix(0.0f, PI, V);
 
-			glm::vec3 VertexPosition =
+			glm::vec3 vertexPosition =
 			{
 				glm::cos(theta) * glm::sin(phi),
 				glm::sin(theta) * glm::sin(phi),
@@ -206,8 +213,9 @@ void createSphereMesh(GLuint resolution, std::vector<Vertex>& vertices, std::vec
 			};
 
 			vertices.push_back(Vertex
-			{
-				VertexPosition,
+				{
+				vertexPosition,
+				glm::normalize(vertexPosition),
 				glm::vec3{ 1.0f, 1.0f, 1.0f },
 				glm::vec2{ 1.0f - U, 1.0f - V }
 			});
@@ -257,13 +265,15 @@ GLuint loadSphere(GLuint& numVertices, GLuint& numIndexes)
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
 	glEnableVertexAttribArray(2);
+	glEnableVertexAttribArray(3);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
 
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, color)));
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, UV)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, normal)));
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, color)));
+	glVertexAttribPointer(3, 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, UV)));
 
 	glBindVertexArray(0);
 
@@ -389,21 +399,34 @@ int main()
 		GLint shaderProgramID = loadShader("shaders/triangle_vertex.glsl", "shaders/triangle_frag.glsl");
 
 		// LOAD TEXTURE
-		GLuint textureID = loadTexture("textures/earth.jpg");
+		GLuint earthTextureID = loadTexture("textures/earth.jpg");
+		GLuint cloudsTextureID = loadTexture("textures/clouds.jpg");
 
 		// LOADING MODEL
 		GLuint numVertices = 0;
 		GLuint numIndexes = 0;
 		GLuint sphereVAO = loadSphere(numVertices, numIndexes);
 
-		// MODEL MATRIX
-		glm::mat4 modelMatrix = glm::rotate( glm::identity<glm::mat4>(), glm::radians(90.f), glm::vec3(1.0f, 0.0f, 0.0f) );
+		// MODEL MATRIX (ROTATE TO FOCUS BRAZIL <3)
+		glm::mat4 modelMatrix = glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.f), glm::vec3(1.0f, 0.0f, 0.0f))
+								* glm::rotate(glm::identity<glm::mat4>(), glm::radians(220.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+		float spinVelocity = 2.0f;
 
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		double previousTime = glfwGetTime();
 
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_BACK);
+
+		glEnable(GL_DEPTH_BUFFER);
+		glDepthFunc(GL_LESS);
+
+		DirectionalLight light
+		{
+			glm::vec3(0.0f, 0.0f, -1.0),
+			1.0f
+		};
 
 		while (!glfwWindowShouldClose(window))
 		{
@@ -420,30 +443,45 @@ int main()
 			double fps = std::round( (1000.0 / deltaTime) / 1000.0 );
 			updateWindowFPS(window, title.c_str(), fps);
 
+			// MAKING THE SPHERE ROTATE
+			modelMatrix *= glm::rotate(glm::identity<glm::mat4>(), glm::radians<float>(spinVelocity * deltaTime), glm::vec3(0.0f, 0.0f, 1.0f));
+
 			// STARTING WITH OPENGL OPERATIONS
 
-			glClear(GL_COLOR_BUFFER_BIT);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			glUseProgram(shaderProgramID);
 
 			GLint modelViewProjectionLoc = glGetUniformLocation(shaderProgramID, "modelViewProjection");
 			glUniformMatrix4fv(modelViewProjectionLoc, 1, GL_FALSE, glm::value_ptr(camera->getViewProjection() * modelMatrix));
 
+			glm::mat4 normalMatrix = glm::inverse(glm::transpose(camera->getView() * modelMatrix));
+			GLuint normalMatrixLoc = glGetUniformLocation(shaderProgramID, "normalMatrix");
+			glUniformMatrix4fv(normalMatrixLoc, 1, GL_FALSE, glm::value_ptr(normalMatrix));
+
+			// TEXTURES 
+
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, textureID);
-			GLint textureSamplerLoc = glGetUniformLocation(shaderProgramID, "textureSampler");
-			glUniform1i(textureSamplerLoc, 0);
+			glBindTexture(GL_TEXTURE_2D, earthTextureID);
+			GLint earthTextureLoc = glGetUniformLocation(shaderProgramID, "earthTexture");
+			glUniform1i(earthTextureLoc, 0);
 
-			glBindVertexArray(sphereVAO);
-			glLineWidth(10.0f);
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-			glDrawElements(GL_TRIANGLES, numIndexes, GL_UNSIGNED_INT, nullptr);
-			glBindVertexArray(0);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, cloudsTextureID);
+			GLint cloudsTextureLoc = glGetUniformLocation(shaderProgramID, "cloudsTexture");
+			glUniform1i(cloudsTextureLoc, 1);
 
-			glUseProgram(0);
+			// LIGHT
 
-			glfwPollEvents();
-			glfwSwapBuffers(window);
+			GLint lightDirectionLoc = glGetUniformLocation(shaderProgramID, "lightDirection");
+			glUniform3fv(lightDirectionLoc, 1, glm::value_ptr(camera->getView() * glm::vec4{ light.direction, 0.0f }));
 
+			GLint lightIntensityLoc = glGetUniformLocation(shaderProgramID, "lightIntensity");
+			glUniform1f(lightIntensityLoc, light.intensity);
+
+			// MISC
+			GLint timeLoc = glGetUniformLocation(shaderProgramID, "time");
+			glUniform1f(timeLoc, currentTime);
+			
 			// CHECK FOR KEYBOARD INTERRUPTS
 
 			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
@@ -481,6 +519,15 @@ int main()
 				camera->moveUp(2.5f * deltaTime);
 			}
 
+			if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
+			{
+				spinVelocity = 500.0f;
+			}
+			else
+			{
+				spinVelocity = 2.0f;
+			}
+
 			if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
 			{
 				camera->moveUp(-2.5f * deltaTime);
@@ -507,6 +554,19 @@ int main()
 			{
 				camera->look((deltaCursorMovement * mouseSensitivity) * glm::vec2(-1));
 			}
+
+			// DRAW
+
+			glBindVertexArray(sphereVAO);
+			glLineWidth(10.0f);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			glDrawElements(GL_TRIANGLES, numIndexes, GL_UNSIGNED_INT, nullptr);
+			glBindVertexArray(0);
+
+			glUseProgram(0);
+
+			glfwPollEvents();
+			glfwSwapBuffers(window);
 		}
 	}
 	catch (std::exception& e)

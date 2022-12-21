@@ -4,7 +4,7 @@
 class Camera
 {
 	public:
-		const glm::vec3 DEFAULT_POSITION{ 0.0f, 0.0f, 10.0f };
+		const glm::vec3 DEFAULT_POSITION{ 0.0f, 0.0f, 5.0f };
 		const glm::vec3 DEFAULT_DIRECTION{ 0.0f, 0.0f, -1.0f };
 		const glm::vec3 DEFAULT_UP{ 0.0f, 1.0f, 0.0f };
 		glm::vec3 position = DEFAULT_POSITION;
@@ -17,6 +17,7 @@ class Camera
 		float speed = 1.0f;
 
 		Camera(int viewportWidth, int viewportHeight);
+		glm::mat4 getView() const;
 		glm::mat4 getViewProjection() const;
 		void moveFoward(float amount);
 		void moveMouseAxis(glm::vec2 amount, glm::vec3* anchor, bool useX = false);
