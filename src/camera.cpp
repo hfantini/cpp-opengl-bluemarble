@@ -27,6 +27,11 @@ void Camera::moveRight(float amount)
 	this->position += right * amount * speed;
 }
 
+void Camera::moveUp(float amount)
+{
+	this->position += glm::normalize(this->up) * amount * this->speed;
+}
+
 void Camera::moveMouseAxis(glm::vec2 amount, glm::vec3* anchor, bool useX)
 {
 	glm::vec3 right = glm::normalize(glm::cross(this->direction, this->up));

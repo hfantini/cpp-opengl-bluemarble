@@ -21,6 +21,7 @@ class Camera
 		void moveFoward(float amount);
 		void moveMouseAxis(glm::vec2 amount, glm::vec3* anchor, bool useX = false);
 		void moveRight(float amount);
+		void moveUp(float amount);
 		void look(glm::vec2 amount);
 		void roll(float amount);
 		void reset();

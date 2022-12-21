@@ -9,14 +9,15 @@
 #include <ext.hpp>
 #include <fstream>
 #include <math.h>
+#include <vector>
 #include "camera.hpp"
 #include "gtx/string_cast.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-const int WINDOW_WIDTH = 800;
-const int WINDOW_HEIGHT = 600;
+int windowWidth = 0;
+int windowHeight = 0;
 GLint GLMajorVersion = 0;
 GLint GLMinorVersion = 0;
 glm::vec2 mouseSensitivity{ 0.03f, 0.03f };
@@ -25,8 +26,15 @@ glm::vec2 deltaUpCursorMovement{ 0.0f, 0.0f };
 bool enableVerticalMouseMovement = false;
 glm::vec2 onClickMousePosition{ 0.0f, 0.0f };
 glm::vec3 cameraAnchorPosition{ 0.0f };
-Camera camera = Camera(WINDOW_WIDTH, WINDOW_HEIGHT);
+Camera* camera;
 std::string title = std::string("BLUE MARBLE - HF");
+
+struct Vertex
+{
+	glm::vec3 position;
+	glm::vec3 color;
+	glm::vec2 UV;
+};
 
 std::string readFile(const char* path)
 {
@@ -139,17 +147,8 @@ GLuint loadShader(const char* vertexShaderFile, const char* fragmentShaderFile)
 	return programID;
 }
 
-struct Vertex
-{
-	glm::vec3 position;
-	glm::vec3 color;
-	glm::vec2 UV;
-};
-
 GLuint loadTexture(const char* textureFile)
 {
-	stbi_set_flip_vertically_on_load(true);
-
 	int textureWidth = 0;
 	int textureHeight = 0;
 	int numberOfComponents = 0;
@@ -180,6 +179,97 @@ GLuint loadTexture(const char* textureFile)
 	return textureID;
 }
 
+void createSphereMesh(GLuint resolution, std::vector<Vertex>& vertices, std::vector<glm::ivec3>& indexes)
+{
+	vertices.clear();
+	indexes.clear();
+
+	constexpr float PI = glm::pi<float>();
+	constexpr float TWO_PI = glm::two_pi<float>();
+	float negativeRes = 1.0f / static_cast<float>(resolution - 1);
+
+	for (GLuint UIndex = 0; UIndex < resolution; ++UIndex)
+	{
+		const float U = UIndex * negativeRes;
+		const float theta = glm::mix(0.0f, TWO_PI, U);
+
+		for (GLuint VIndex = 0; VIndex < resolution; ++VIndex)
+		{
+			const float V = VIndex * negativeRes;
+			const float phi = glm::mix(0.0f, PI, V);
+
+			glm::vec3 VertexPosition =
+			{
+				glm::cos(theta) * glm::sin(phi),
+				glm::sin(theta) * glm::sin(phi),
+				glm::cos(phi)
+			};
+
+			vertices.push_back(Vertex
+			{
+				VertexPosition,
+				glm::vec3{ 1.0f, 1.0f, 1.0f },
+				glm::vec2{ 1.0f - U, 1.0f - V }
+			});
+		}
+	}
+
+	for (GLuint U = 0; U < resolution - 1; ++U)
+	{
+		for (GLuint V = 0; V < resolution - 1; ++V)
+		{
+			GLuint P0 = U + V * resolution;
+			GLuint P1 = U + 1 + V * resolution;
+			GLuint P2 = U + (V + 1) * resolution;
+			GLuint P3 = U + 1 + (V + 1) * resolution;
+
+			indexes.push_back(glm::vec3{ P3, P2, P0 });
+			indexes.push_back(glm::vec3{ P1, P3, P0 });
+		}
+	}
+}
+
+GLuint loadSphere(GLuint& numVertices, GLuint& numIndexes)
+{
+	std::vector<Vertex> vertices;
+	std::vector<glm::ivec3> indexes;
+	createSphereMesh(100, vertices, indexes);
+
+	numVertices = vertices.size() * sizeof(Vertex);
+	numIndexes = indexes.size() * sizeof(glm::ivec3);
+
+	GLuint vertexBuffer;
+	glGenBuffers(1, &vertexBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+	glBufferData(GL_ARRAY_BUFFER, numVertices, vertices.data(), GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	GLuint elementBuffer;
+	glGenBuffers(1, &elementBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, numIndexes, indexes.data(), GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	GLuint VAO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, color)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, UV)));
+
+	glBindVertexArray(0);
+
+	return VAO;
+}
+
 void updateWindowFPS(GLFWwindow* window, const char* original, double fps)
 {
 	std::stringstream ss;
@@ -190,7 +280,7 @@ void updateWindowFPS(GLFWwindow* window, const char* original, double fps)
 void resetMouseValues(GLFWwindow* window)
 {
 	deltaCursorMovement = glm::vec2{ 0.0f };
-	glfwSetCursorPos(window, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2);
+	glfwSetCursorPos(window, windowWidth / 2, windowHeight / 2);
 }
 
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
@@ -202,7 +292,7 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 			double x, y;
 			glfwGetCursorPos(window, &x, &y);
 			onClickMousePosition = glm::vec2(x, y);
-			cameraAnchorPosition = camera.position;
+			cameraAnchorPosition = camera->position;
 			enableVerticalMouseMovement = true;
 		}
 		else
@@ -223,12 +313,23 @@ void mouseMoveCallback(GLFWwindow* window, double x, double y)
 	}
 	else
 	{
-		deltaCursorMovement = currentCursorPos - glm::vec2{ WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 };
+		deltaCursorMovement = currentCursorPos - glm::vec2{ windowWidth / 2, windowHeight / 2 };
 	}
+}
+
+void windowResize(GLFWwindow* window, int width, int height)
+{
+	windowWidth = width;
+	windowWidth = height;
+
+	camera->aspectRatio = static_cast<float>(width) / height;
+	glViewport(0, 0, width, height);
 }
 
 int main()
 {
+	int retValue = 0;
+
 	try
 	{
 		if (glfwInit() == GLFW_FALSE)
@@ -238,7 +339,18 @@ int main()
 			return 1;
 		}
 
-		GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, title.c_str(), nullptr, nullptr);
+		GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+		const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+
+		windowWidth = mode->width;
+		windowHeight = mode->height;
+		glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+		glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+		glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+		glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+
+		GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, title.c_str(), monitor, NULL);
+
 		if (window == nullptr)
 		{
 			MessageBox(NULL, "Failed at create GLFW Window...", "Ops!", MB_OK | MB_ICONERROR);
@@ -246,13 +358,12 @@ int main()
 			return 1;
 		}
 
-
 		glfwMakeContextCurrent(window);
 		GLenum status = glewInit();
 		if (status != GLEW_OK)
 		{
 			std::string message = std::string("Failed at init GLEW: ").append((char*)glewGetErrorString(status));
-			;		MessageBox(NULL, message.c_str(), "Ops!", MB_OK | MB_ICONERROR);
+			MessageBox(NULL, message.c_str(), "Ops!", MB_OK | MB_ICONERROR);
 			glfwTerminate();
 			return 1;
 		}
@@ -264,11 +375,15 @@ int main()
 		ss << title << " (OPENGL " << GLMajorVersion << "." << GLMinorVersion << ")";
 		title = ss.str();
 
+		glViewport(0, 0, windowWidth, windowHeight);
+		camera = new Camera(windowWidth, windowHeight);
+
 		glfwSetWindowTitle(window, title.c_str());
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		resetMouseValues(window);
 		glfwSetMouseButtonCallback(window, mouseButtonCallback);
 		glfwSetCursorPosCallback(window, mouseMoveCallback);
+		glfwSetFramebufferSizeCallback(window, windowResize);
 
 		// LOAD, COMPILE AND LINK PROGRAM BASED ON VERTEX AND FRAGMENT SHADER
 		GLint shaderProgramID = loadShader("shaders/triangle_vertex.glsl", "shaders/triangle_frag.glsl");
@@ -276,42 +391,19 @@ int main()
 		// LOAD TEXTURE
 		GLuint textureID = loadTexture("textures/earth.jpg");
 
-		// TRIANGLE VERTEX
-
-		std::array<Vertex, 4> quad =
-		{
-			Vertex{glm::vec3 {-1.0f, -1.0f, 0.0f}, glm::vec3 {1.0f, 0.0f, 0.0f}, glm::vec2 {0.0, 0.0}},
-			Vertex{glm::vec3 {1.0f, -1.0f, 0.0f}, glm::vec3 {0.0f, 1.0f, 0.0f}, glm::vec2 {1.0, 0.0}},
-			Vertex{glm::vec3 {1.0f, 1.0f, 0.0f}, glm::vec3 {0.0f, 0.0f, 1.0f}, glm::vec2 {1.0, 1.0}},
-			Vertex{glm::vec3 {-1.0f, 1.0f, 0.0f}, glm::vec3 {1.0f, 0.0f, 0.0f}, glm::vec2 {0.0, 1.0}}
-		};
-
-		std::array<glm::ivec3, 2> indices =
-		{
-			glm::ivec3{0, 1, 3},
-			glm::ivec3{3, 1, 2}
-		};
+		// LOADING MODEL
+		GLuint numVertices = 0;
+		GLuint numIndexes = 0;
+		GLuint sphereVAO = loadSphere(numVertices, numIndexes);
 
 		// MODEL MATRIX
+		glm::mat4 modelMatrix = glm::rotate( glm::identity<glm::mat4>(), glm::radians(90.f), glm::vec3(1.0f, 0.0f, 0.0f) );
 
-		glm::mat4 modelMatrix = glm::identity<glm::mat4>();
-
-		// CREATING VEXTEX BUFFER
-
-		GLuint vertexBuffer;
-		glGenBuffers(1, &vertexBuffer);
-
-		GLuint elementBuffer;
-		glGenBuffers(1, &elementBuffer);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
-
-		glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad.data(), GL_STATIC_DRAW);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices.data(), GL_STATIC_DRAW);
-
-		glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
+		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		double previousTime = glfwGetTime();
+
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
 
 		while (!glfwWindowShouldClose(window))
 		{
@@ -326,7 +418,6 @@ int main()
 			// UPDATE TIMINGS
 
 			double fps = std::round( (1000.0 / deltaTime) / 1000.0 );
-			//std::cout << "Previous Time: " << previousTime << " | CurrentTime: " << currentTime << " | Delta Time: " << deltaTime << " | FPS: " << fps << std::endl;
 			updateWindowFPS(window, title.c_str(), fps);
 
 			// STARTING WITH OPENGL OPERATIONS
@@ -335,30 +426,19 @@ int main()
 			glUseProgram(shaderProgramID);
 
 			GLint modelViewProjectionLoc = glGetUniformLocation(shaderProgramID, "modelViewProjection");
-			glUniformMatrix4fv(modelViewProjectionLoc, 1, GL_FALSE, glm::value_ptr(camera.getViewProjection() * modelMatrix));
+			glUniformMatrix4fv(modelViewProjectionLoc, 1, GL_FALSE, glm::value_ptr(camera->getViewProjection() * modelMatrix));
 
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, textureID);
 			GLint textureSamplerLoc = glGetUniformLocation(shaderProgramID, "textureSampler");
 			glUniform1i(textureSamplerLoc, 0);
 
-			glEnableVertexAttribArray(0);
-			glEnableVertexAttribArray(1);
-			glEnableVertexAttribArray(2);
+			glBindVertexArray(sphereVAO);
+			glLineWidth(10.0f);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			glDrawElements(GL_TRIANGLES, numIndexes, GL_UNSIGNED_INT, nullptr);
+			glBindVertexArray(0);
 
-			glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-			glVertexAttribPointer(1, 3, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, color)));
-			glVertexAttribPointer(2, 2, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, UV)));
-
-			glDrawElements(GL_TRIANGLES, sizeof(indices) * 3, GL_UNSIGNED_INT, nullptr);
-
-			glBindBuffer(GL_ARRAY_BUFFER, 0);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-			glDisableVertexAttribArray(0);
-			glDisableVertexAttribArray(1);
-			glDisableVertexAttribArray(2);
 			glUseProgram(0);
 
 			glfwPollEvents();
@@ -368,38 +448,48 @@ int main()
 
 			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 			{
-				camera.moveFoward(2.5f * deltaTime);
+				camera->moveFoward(2.5f * deltaTime);
 			}
 
 			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
 			{
-				camera.moveFoward(-2.5f * deltaTime);
+				camera->moveFoward(-2.5f * deltaTime);
 			}
 
 			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 			{
-				camera.moveRight(2.5f * deltaTime);
+				camera->moveRight(2.5f * deltaTime);
 			}
 
 			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 			{
-				camera.moveRight(-2.5f * deltaTime);
+				camera->moveRight(-2.5f * deltaTime);
 			}
 
 			if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
 			{
-				camera.roll(-100.0f * deltaTime);
+				camera->roll(-100.0f * deltaTime);
 			}
 
 			if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
 			{
-				camera.roll(100.0f * deltaTime);
+				camera->roll(100.0f * deltaTime);
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+			{
+				camera->moveUp(2.5f * deltaTime);
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+			{
+				camera->moveUp(-2.5f * deltaTime);
 			}
 
 			if (glfwGetKey(window, GLFW_KEY_HOME) == GLFW_PRESS)
 			{
 				resetMouseValues(window);
-				camera.reset();
+				camera->reset();
 			}
 
 			if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -411,24 +501,31 @@ int main()
 
 			if (enableVerticalMouseMovement)
 			{
-				camera.moveMouseAxis((deltaUpCursorMovement * mouseSensitivity), &cameraAnchorPosition);
+				camera->moveMouseAxis((deltaUpCursorMovement * mouseSensitivity), &cameraAnchorPosition);
 			}
 			else
 			{
-				camera.look((deltaCursorMovement * mouseSensitivity) * glm::vec2(-1));
+				camera->look((deltaCursorMovement * mouseSensitivity) * glm::vec2(-1));
 			}
 		}
-
-		glDeleteBuffers(1, &vertexBuffer);
-		glfwTerminate();
-		return 0;
 	}
 	catch (std::exception& e)
 	{
 		std::stringstream ss;
 		ss << "Fatal Exception! The program cannot continue: " << e.what();
 		MessageBox(NULL, ss.str().c_str(), "Ops!", MB_OK | MB_ICONERROR);
-		glfwTerminate();
-		return 1;
+
+		retValue = 1;
 	}
+
+	// FREE MEMORY REFERENCES
+
+	if (camera)
+	{
+		delete camera;
+	}
+
+	glfwTerminate();
+
+	return retValue;
 }
